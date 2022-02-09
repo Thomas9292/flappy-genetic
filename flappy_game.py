@@ -59,8 +59,6 @@ class FlappyGame:
             'assets/sprites/pipe-red.png',
         )
 
-
-    def play(self):
         pygame.init()
         self.FPSCLOCK = pygame.time.Clock()
         self.SCREEN = pygame.display.set_mode((self.SCREENWIDTH, self.SCREENHEIGHT))
@@ -99,96 +97,69 @@ class FlappyGame:
         self.SOUNDS['swoosh'] = pygame.mixer.Sound('assets/audio/swoosh' + soundExt)
         self.SOUNDS['wing']   = pygame.mixer.Sound('assets/audio/wing' + soundExt)
 
-        while True:
-            # select random background sprites
-            randBg = random.randint(0, len(self.BACKGROUNDS_LIST) - 1)
-            self.IMAGES['background'] = pygame.image.load(self.BACKGROUNDS_LIST[randBg]).convert()
+        # select random background sprites
+        randBg = random.randint(0, len(self.BACKGROUNDS_LIST) - 1)
+        self.IMAGES['background'] = pygame.image.load(self.BACKGROUNDS_LIST[randBg]).convert()
 
-            # select random player sprites
-            randPlayer = random.randint(0, len(self.PLAYERS_LIST) - 1)
-            self.IMAGES['player'] = (
-                pygame.image.load(self.PLAYERS_LIST[randPlayer][0]).convert_alpha(),
-                pygame.image.load(self.PLAYERS_LIST[randPlayer][1]).convert_alpha(),
-                pygame.image.load(self.PLAYERS_LIST[randPlayer][2]).convert_alpha(),
-            )
+        # select random player sprites
+        randPlayer = random.randint(0, len(self.PLAYERS_LIST) - 1)
+        self.IMAGES['player'] = (
+            pygame.image.load(self.PLAYERS_LIST[randPlayer][0]).convert_alpha(),
+            pygame.image.load(self.PLAYERS_LIST[randPlayer][1]).convert_alpha(),
+            pygame.image.load(self.PLAYERS_LIST[randPlayer][2]).convert_alpha(),
+        )
 
-            # select random pipe sprites
-            pipeindex = random.randint(0, len(self.PIPES_LIST) - 1)
-            self.IMAGES['pipe'] = (
-                pygame.transform.flip(
-                    pygame.image.load(self.PIPES_LIST[pipeindex]).convert_alpha(), False, True),
-                pygame.image.load(self.PIPES_LIST[pipeindex]).convert_alpha(),
-            )
+        # select random pipe sprites
+        pipeindex = random.randint(0, len(self.PIPES_LIST) - 1)
+        self.IMAGES['pipe'] = (
+            pygame.transform.flip(
+                pygame.image.load(self.PIPES_LIST[pipeindex]).convert_alpha(), False, True),
+            pygame.image.load(self.PIPES_LIST[pipeindex]).convert_alpha(),
+        )
 
-            # hitmask for pipes
-            self.HITMASKS['pipe'] = (
-                self.getHitmask(self.IMAGES['pipe'][0]),
-                self.getHitmask(self.IMAGES['pipe'][1]),
-            )
+        # hitmask for pipes
+        self.HITMASKS['pipe'] = (
+            self.getHitmask(self.IMAGES['pipe'][0]),
+            self.getHitmask(self.IMAGES['pipe'][1]),
+        )
 
-            # hitmask for player
-            self.HITMASKS['player'] = (
-                self.getHitmask(self.IMAGES['player'][0]),
-                self.getHitmask(self.IMAGES['player'][1]),
-                self.getHitmask(self.IMAGES['player'][2]),
-            )
-
-            movementInfo = self.showWelcomeAnimation()
-            crashInfo = self.mainGame(movementInfo)
-            self.showGameOverScreen(crashInfo)
-
-
-    def showWelcomeAnimation(self):
-        """Shows welcome screen animation of flappy bird"""
-        # index of player to blit on screen
-        playerIndex = 0
-        playerIndexGen = cycle([0, 1, 2, 1])
-        # iterator used to change playerIndex after every 5th iteration
-        loopIter = 0
+        # hitmask for player
+        self.HITMASKS['player'] = (
+            self.getHitmask(self.IMAGES['player'][0]),
+            self.getHitmask(self.IMAGES['player'][1]),
+            self.getHitmask(self.IMAGES['player'][2]),
+        )
 
         playerx = int(self.SCREENWIDTH * 0.2)
         playery = int((self.SCREENHEIGHT - self.IMAGES['player'][0].get_height()) / 2)
-
-        messagex = int((self.SCREENWIDTH - self.IMAGES['message'].get_width()) / 2)
-        messagey = int(self.SCREENHEIGHT * 0.12)
-
-        basex = 0
-        # amount by which base can maximum shift to left
-        baseShift = self.IMAGES['base'].get_width() - self.IMAGES['background'].get_width()
-
-        # player shm for up-down motion on welcome screen
         playerShmVals = {'val': 0, 'dir': 1}
+        basex = 0
+        playerIndexGen = cycle([0, 1, 2, 1])
 
-        while True:
-            for event in pygame.event.get():
-                if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                    pygame.quit()
-                    sys.exit()
-                if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
-                    # make first flap sound and return values for mainGame
-                    self.SOUNDS['wing'].play()
-                    return {
-                        'playery': playery + playerShmVals['val'],
-                        'basex': basex,
-                        'playerIndexGen': playerIndexGen,
-                    }
+        baseShift = self.IMAGES['base'].get_width() - self.IMAGES['background'].get_width()
+        basex = -((-basex + 4) % baseShift)
+        self.playerShm(playerShmVals)
 
-            # adjust playery, playerIndex, basex
-            if (loopIter + 1) % 5 == 0:
-                playerIndex = next(playerIndexGen)
-            loopIter = (loopIter + 1) % 30
-            basex = -((-basex + 4) % baseShift)
-            self.playerShm(playerShmVals)
+        self.movementInfo = {
+            'playery': playery + playerShmVals['val'],
+            'basex': basex,
+            'playerIndexGen': playerIndexGen,
+        }
 
-            # draw sprites
-            self.SCREEN.blit(self.IMAGES['background'], (0,0))
-            self.SCREEN.blit(self.IMAGES['player'][playerIndex],
-                        (playerx, playery + playerShmVals['val']))
-            self.SCREEN.blit(self.IMAGES['message'], (messagex, messagey))
-            self.SCREEN.blit(self.IMAGES['base'], (basex, self.BASEY))
+        # draw sprites
+        self.SCREEN.blit(self.IMAGES['background'], (0,0))
+        self.SCREEN.blit(self.IMAGES['player'][0],
+                    (playerx, playery + playerShmVals['val']))
+        self.SCREEN.blit(self.IMAGES['base'], (basex, self.BASEY))
 
-            pygame.display.update()
-            self.FPSCLOCK.tick(self.FPS)
+        pygame.display.update()
+        self.FPSCLOCK.tick(self.FPS)
+
+
+    def play(self):
+        self.SOUNDS['wing'].play()
+        crashInfo = self.mainGame(self.movementInfo)
+        self.showGameOverScreen(crashInfo)
 
 
     def mainGame(self, movementInfo):
@@ -224,7 +195,6 @@ class FlappyGame:
         # player velocity, max velocity, downward acceleration, acceleration on flap
         playerVelY    =  -9   # player's velocity along Y, default same as playerFlapped
         playerMaxVelY =  10   # max vel along Y, max descend speed
-        playerMinVelY =  -8   # min vel along Y, max ascend speed
         playerAccY    =   1   # players downward acceleration
         playerRot     =  45   # player's rotation
         playerVelRot  =   3   # angular speed
@@ -348,15 +318,8 @@ class FlappyGame:
         if not crashInfo['groundCrash']:
             self.SOUNDS['die'].play()
 
-        while True:
-            for event in pygame.event.get():
-                if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                    pygame.quit()
-                    sys.exit()
-                if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
-                    if playery + playerHeight >= self.BASEY - 1:
-                        return
-
+        i = 0
+        while i < 2 * self.FPS:
             # player y shift
             if playery + playerHeight < self.BASEY - 1:
                 playery += min(playerVelY, self.BASEY - playery - playerHeight)
@@ -384,6 +347,7 @@ class FlappyGame:
             self.SCREEN.blit(playerSurface, (playerx,playery))
             self.SCREEN.blit(self.IMAGES['gameover'], (50, 180))
 
+            i += 1
             self.FPSCLOCK.tick(self.FPS)
             pygame.display.update()
 
