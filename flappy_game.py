@@ -175,10 +175,11 @@ class FlappyGame:
         crashInfo = self.mainGame(self.movementInfo)
         self.showGameOverScreen(crashInfo)
 
-    def mainGame(self, movementInfo, agent=None):
+    def mainGame(self, movementInfo, agents):
         score = playerIndex = loopIter = 0
+        n_agents = len(agents)
         playerIndexGen = movementInfo["playerIndexGen"]
-        playerx, playery = int(self.SCREENWIDTH * 0.2), movementInfo["playery"]
+        playerx, playery = int(self.SCREENWIDTH * 0.2), [movementInfo["playery"]] * n_agents
 
         basex = movementInfo["basex"]
         baseShift = (
@@ -214,15 +215,16 @@ class FlappyGame:
         pipeVelX = -128 * dt
 
         # player velocity, max velocity, downward acceleration, acceleration on flap
-        playerVelY = -9  # player's velocity along Y, default same as playerFlapped
+        playerVelY = [-9] * n_agents  # player's velocity along Y, default same as playerFlapped
         playerMaxVelY = 10  # max vel along Y, max descend speed
         playerAccY = 1  # players downward acceleration
-        playerRot = 45  # player's rotation
+        playerRot = [45] * n_agents  # player's rotation
         playerVelRot = 3  # angular speed
         playerRotThr = 20  # rotation threshold
         playerFlapAcc = -9  # players speed on flapping
-        playerFlapped = False  # True when player flaps
-        playerFitness = 0
+        playerFlapped = [False] * n_agents  # True when player flaps
+        playerFitness = [0] * n_agents # Fitness of players
+        playerAlive = [True] * n_agents # If player still alive
 
         while True:
             for event in pygame.event.get():
@@ -231,77 +233,73 @@ class FlappyGame:
                 ):
                     pygame.quit()
                     sys.exit()
-                if event.type == KEYDOWN and (
-                    event.key == K_SPACE or event.key == K_UP
-                ):
-                    if playery > -2 * self.IMAGES["player"][0].get_height():
-                        playerVelY = playerFlapAcc
-                        playerFlapped = True
-                        self.SOUNDS["wing"].play()
 
             # Determine agent action
-            if agent:
-                dist_to_pipe = upperPipes[0]["x"] - playerx
-                vertical_dist_to_hole = (upperPipes[0]["y"] + lowerPipes[0]["y"]) / 2
-                if agent.predict_jump(dist_to_pipe, vertical_dist_to_hole):
-                    playerVelY = playerFlapAcc
-                    playerFlapped = True
-                    self.SOUNDS["wing"].play()
+            for i, agent in enumerate(agents):
+                if playerAlive[i]:
+                    dist_to_pipe = upperPipes[0]["x"] - playerx
+                    vertical_dist_to_hole = ((upperPipes[0]["y"] + lowerPipes[0]["y"]) / 2) - playery[i]
+                    if agent.predict_jump(dist_to_pipe, vertical_dist_to_hole):
+                        playerVelY[i] = playerFlapAcc
+                        playerFlapped[i] = True
+                        self.SOUNDS["wing"].play()
 
-            # check for crash here
-            crashTest = self.checkCrash(
-                {"x": playerx, "y": playery, "index": playerIndex},
-                upperPipes,
-                lowerPipes,
-            )
-            if crashTest[0]:
-                # Add distance to vertical hole to fitness for hot start
-                playerFitness += abs(1 / vertical_dist_to_hole)
-                return {
-                    "y": playery,
-                    "groundCrash": crashTest[1],
-                    "basex": basex,
-                    "upperPipes": upperPipes,
-                    "lowerPipes": lowerPipes,
-                    "score": score,
-                    "playerVelY": playerVelY,
-                    "playerRot": playerRot,
-                    "playerFitness": playerFitness,
-                    "verticalDist": vertical_dist_to_hole,
-                }
+                    # increase fitness
+                    playerFitness[i] += 1
 
-            # increase fitness
-            playerFitness += 1
+                    # check for crash here
+                    crashTest = self.checkCrash(
+                        {"x": playerx, "y": playery[i], "index": playerIndex},
+                        upperPipes,
+                        lowerPipes,
+                    )
+                    if crashTest[0]:
+                        playerAlive[i] = False
+                        # Add distance to vertical hole to fitness for hot start
+                        playerFitness[i] += abs(1 / vertical_dist_to_hole)
 
-            # check for score
-            playerMidPos = playerx + self.IMAGES["player"][0].get_width() / 2
-            for pipe in upperPipes:
-                pipeMidPos = pipe["x"] + self.IMAGES["pipe"][0].get_width() / 2
-                if pipeMidPos <= playerMidPos < pipeMidPos + 4:
-                    score += 1
-                    self.SOUNDS["point"].play()
+                        if not any(playerAlive):
+                            return {
+                                "y": playery[i],
+                                "groundCrash": crashTest[1],
+                                "basex": basex,
+                                "upperPipes": upperPipes,
+                                "lowerPipes": lowerPipes,
+                                "score": score,
+                                "playerVelY": playerVelY[i],
+                                "playerRot": playerRot[i],
+                                "fitness": playerFitness,
+                            }
+
+                    # check for score
+                    playerMidPos = playerx + self.IMAGES["player"][0].get_width() / 2
+                    for pipe in upperPipes:
+                        pipeMidPos = pipe["x"] + self.IMAGES["pipe"][0].get_width() / 2
+                        if pipeMidPos <= playerMidPos < pipeMidPos + 4:
+                            score += 1
+                            self.SOUNDS["point"].play()
+
+                    # rotate the player
+                    if playerRot[i] > -90:
+                        playerRot[i] -= playerVelRot
+
+                    # player's movement
+                    if playerVelY[i] < playerMaxVelY and not playerFlapped[i]:
+                        playerVelY[i] += playerAccY
+                    if playerFlapped:
+                        playerFlapped[i] = False
+
+                        # more rotation to cover the threshold (calculated in visible rotation)
+                        playerRot[i] = 45
+
+                    playerHeight = self.IMAGES["player"][playerIndex].get_height()
+                    playery[i] += min(playerVelY[i], self.BASEY - playery[i] - playerHeight)
 
             # playerIndex basex change
             if (loopIter + 1) % 3 == 0:
                 playerIndex = next(playerIndexGen)
             loopIter = (loopIter + 1) % 30
             basex = -((-basex + 100) % baseShift)
-
-            # rotate the player
-            if playerRot > -90:
-                playerRot -= playerVelRot
-
-            # player's movement
-            if playerVelY < playerMaxVelY and not playerFlapped:
-                playerVelY += playerAccY
-            if playerFlapped:
-                playerFlapped = False
-
-                # more rotation to cover the threshold (calculated in visible rotation)
-                playerRot = 45
-
-            playerHeight = self.IMAGES["player"][playerIndex].get_height()
-            playery += min(playerVelY, self.BASEY - playery - playerHeight)
 
             # move pipes to left
             for uPipe, lPipe in zip(upperPipes, lowerPipes):
@@ -331,17 +329,19 @@ class FlappyGame:
 
             self.SCREEN.blit(self.IMAGES["base"], (basex, self.BASEY))
             # print score so player overlaps the score
-            self.showScore(score)
+            # self.showScore(score)
 
-            # Player rotation has a threshold
-            visibleRot = playerRotThr
-            if playerRot <= playerRotThr:
-                visibleRot = playerRot
+            for i, alive in enumerate(playerAlive):
+                if alive:
+                    # Player rotation has a threshold
+                    visibleRot = playerRotThr
+                    if playerRot[i] <= playerRotThr:
+                        visibleRot = playerRot[i]
 
-            playerSurface = pygame.transform.rotate(
-                self.IMAGES["player"][playerIndex], visibleRot
-            )
-            self.SCREEN.blit(playerSurface, (playerx, playery))
+                    playerSurface = pygame.transform.rotate(
+                        self.IMAGES["player"][playerIndex], visibleRot
+                    )
+                    self.SCREEN.blit(playerSurface, (playerx, playery[i]))
 
             pygame.display.update()
             self.FPSCLOCK.tick(self.FPS)
