@@ -176,7 +176,7 @@ class FlappyGame:
         self.showGameOverScreen(crashInfo)
 
     def mainGame(self, movementInfo, agents):
-        score = playerIndex = loopIter = 0
+        playerIndex = loopIter = 0
         n_agents = len(agents)
         playerIndexGen = movementInfo["playerIndexGen"]
         playerx, playery = int(self.SCREENWIDTH * 0.2), [movementInfo["playery"]] * n_agents
@@ -225,6 +225,7 @@ class FlappyGame:
         playerFlapped = [False] * n_agents  # True when player flaps
         playerFitness = [0] * n_agents # Fitness of players
         playerAlive = [True] * n_agents # If player still alive
+        score = [0] * n_agents
 
         while True:
             for event in pygame.event.get():
@@ -237,7 +238,7 @@ class FlappyGame:
             # Determine agent action
             for i, agent in enumerate(agents):
                 if playerAlive[i]:
-                    dist_to_pipe = upperPipes[0]["x"] - playerx
+                    dist_to_pipe = next(pipe for pipe in upperPipes if pipe["x"] > playerx)["x"] - playerx
                     vertical_dist_to_hole = ((upperPipes[0]["y"] + lowerPipes[0]["y"]) / 2) - playery[i]
                     if agent.predict_jump(dist_to_pipe, vertical_dist_to_hole):
                         playerVelY[i] = playerFlapAcc
@@ -265,7 +266,7 @@ class FlappyGame:
                                 "basex": basex,
                                 "upperPipes": upperPipes,
                                 "lowerPipes": lowerPipes,
-                                "score": score,
+                                "score": score[i],
                                 "playerVelY": playerVelY[i],
                                 "playerRot": playerRot[i],
                                 "fitness": playerFitness,
@@ -275,8 +276,8 @@ class FlappyGame:
                     playerMidPos = playerx + self.IMAGES["player"][0].get_width() / 2
                     for pipe in upperPipes:
                         pipeMidPos = pipe["x"] + self.IMAGES["pipe"][0].get_width() / 2
-                        if pipeMidPos <= playerMidPos < pipeMidPos + 4:
-                            score += 1
+                        if pipeMidPos <= playerMidPos < pipeMidPos + 6:
+                            score[i] += 1
                             self.SOUNDS["point"].play()
 
                     # rotate the player
@@ -329,7 +330,7 @@ class FlappyGame:
 
             self.SCREEN.blit(self.IMAGES["base"], (basex, self.BASEY))
             # print score so player overlaps the score
-            # self.showScore(score)
+            self.showScore(max(score))
 
             for i, alive in enumerate(playerAlive):
                 if alive:

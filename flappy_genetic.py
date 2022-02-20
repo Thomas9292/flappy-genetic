@@ -2,7 +2,7 @@ from flappy_game import FlappyGame
 from agents.random import RandomAgent
 
 game = FlappyGame()
-agents = [RandomAgent(), RandomAgent(), RandomAgent(), RandomAgent(), RandomAgent(), RandomAgent()]
+agents = [RandomAgent(), RandomAgent(), RandomAgent(), RandomAgent(), RandomAgent(), RandomAgent()] * 6
 
 
 for i in range(10):
